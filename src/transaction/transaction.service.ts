@@ -7,24 +7,10 @@ import { Customer } from '../customer/entities/customer.entity';
 import { Product } from 'src/product/entities/product.entity';
 import { Delivery } from 'src/delivery/entities/delivery.entity';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TransactionService {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  remove(_arg0: number) {
-    throw new Error('Method not implemented.');
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  update(arg0: number, _updateTransactionDto: UpdateTransactionDto) {
-    throw new Error('Method not implemented.');
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  findOne(_arg0: number) {
-    throw new Error('Method not implemented.');
-  }
-  findAll() {
-    throw new Error('Method not implemented.');
-  }
   constructor(
     @InjectRepository(Transaction)
     private transactionRepository: Repository<Transaction>,
@@ -34,6 +20,7 @@ export class TransactionService {
     private productRepository: Repository<Product>,
     @InjectRepository(Delivery)
     private deliveryRepository: Repository<Delivery>,
+    private configService: ConfigService, // inyección del ConfigService
   ) {}
 
   async create(dto: CreateTransactionDto) {
@@ -81,5 +68,57 @@ export class TransactionService {
     });
 
     return this.transactionRepository.save(transaction);
+  }
+
+  // ✅ Nuevo método para generar URL de pago en Wompi Checkout
+  async createCheckout(id: number) {
+    const transaction = await this.transactionRepository.findOne({
+      where: { id },
+      relations: ['product'],
+    });
+
+    const publicKey = this.configService.get<string>('WOMPI_PUBLIC_KEY');
+    const redirectUrl = this.configService.get<string>('WOMPI_REDIRECT_URL');
+
+    if (!transaction) {
+      throw new NotFoundException('Transacción no encontrada');
+    }
+
+    if (!publicKey || !redirectUrl) {
+      throw new Error('Faltan variables de entorno de Wompi');
+    }
+
+    const query = new URLSearchParams({
+      currency: 'COP',
+      amount_in_cents: Math.round(transaction.totalAmount * 100).toString(),
+      reference: `tx-${transaction.id}`,
+      public_key: publicKey,
+      redirect_url: redirectUrl,
+    });
+
+    const baseUrl =
+      this.configService.get('WOMPI_CHECKOUT_BASE') ??
+      'https://checkout.staging.wompi.dev/p/';
+
+    return {
+      checkoutUrl: `${baseUrl}?${query.toString()}`,
+    };
+  }
+
+  // Métodos aún no implementados (puedes completarlos luego si los necesitas)
+  remove(_id: number) {
+    throw new Error('Method not implemented.');
+  }
+
+  update(_id: number, _dto: UpdateTransactionDto) {
+    throw new Error('Method not implemented.');
+  }
+
+  findOne(_id: number) {
+    throw new Error('Method not implemented.');
+  }
+
+  findAll() {
+    throw new Error('Method not implemented.');
   }
 }

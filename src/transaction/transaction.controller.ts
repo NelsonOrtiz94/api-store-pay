@@ -42,4 +42,9 @@ export class TransactionController {
   remove(@Param('id') id: string) {
     return this.transactionService.remove(+id);
   }
+
+  @Post(':id/checkout')
+  createCheckout(@Param('id') id: string) {
+    return this.transactionService.createCheckout(+id);
+  }
 }
